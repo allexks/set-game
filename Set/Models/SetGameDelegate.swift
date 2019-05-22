@@ -11,5 +11,7 @@ import Foundation
 protocol SetGameDelegate: class {
   func foundSet()
   func foundMismatch()
-  func updateSelectedCards()
+  func deckGotEmpty()
+  func updateScore(with newScore: Int)
+  func gameOver()
 }

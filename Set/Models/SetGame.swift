@@ -11,14 +11,17 @@ import Foundation
 class SetGame {
   // MARK: - Properties
   private let deck = Deck()
+  private(set) var score = 0 {
+    didSet {
+      delegate?.updateScore(with: score)
+    }
+  }
+  
+  private let scoreRules: ScoreRules = .easy
   
   private(set) var availableCards: [Card] = []
   private(set) var discardedCards: [Card] = []
-  private(set) var selectedCards: [Card] = [] {
-    didSet {
-      delegate?.updateSelectedCards()
-    }
-  }
+  private(set) var selectedCards: [Card] = []
   
   weak var delegate: SetGameDelegate?
   
@@ -54,14 +57,17 @@ class SetGame {
     
     if selectedCards.count == 3 {
       if SetGame.isSet(selectedCards) {
+        score = score + scoreRules.updateOnMatch
         delegate?.foundSet()
+        removeMatchedCards()
       } else {
+        score = score + scoreRules.updateOnMismatch
         delegate?.foundMismatch()
       }
     }
   }
   
-  func deselectCard(_ card: Card) {
+  func disselectCard(_ card: Card) {
     if let indexToRemove = selectedCards.firstIndex(of: card) {
       selectedCards.remove(at: indexToRemove)
     }
@@ -72,6 +78,67 @@ class SetGame {
     
     3.repetitions {
       self.availableCards.append(self.deck.draw())
+    }
+    
+    if let scoreChange = scoreRules.updateOnDealingThreeCards {
+      score = score + scoreChange
+    }
+    
+    if deck.isEmpty {
+      delegate?.deckGotEmpty()
+    }
+  }
+  
+  private func removeMatchedCards() {
+    availableCards = availableCards.filter({ !selectedCards.contains($0) })
+    discardedCards = discardedCards + selectedCards
+    
+    if availableCards.count == 0 && deck.isEmpty {
+      delegate?.gameOver()
+    }
+  }
+}
+
+extension SetGame {
+  enum ScoreRules {
+    case easy, medium, hard
+    case custom(updateOnMatch: Int, updateOnMismatch: Int, updateOnDealingThreeCards: Int?)
+    
+    var updateOnMatch: Int {
+      switch self {
+      case .easy:
+        return +20
+      case .medium:
+        return +10
+      case .hard:
+        return +5
+      case .custom(let x, _, _):
+        return x
+      }
+    }
+    
+    var updateOnMismatch: Int {
+      switch self {
+      case .easy:
+        return -5
+      case .medium:
+        return -10
+      case .hard:
+        return -20
+      case .custom(_, let x, _):
+        return x
+      }
+    }
+    
+    var updateOnDealingThreeCards: Int? {
+      switch self {
+      case .easy, .medium:
+        return nil
+      case .hard:
+        return -5
+      case .custom(_, _, let x):
+        return x
+      }
     }
   }
 }

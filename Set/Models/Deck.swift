@@ -31,10 +31,6 @@ class Deck {
     }
   }
   
-  subscript (_ index: Int) -> Card {
-    return cards[index]
-  }
-  
   func draw() -> Card {
     return cards.removeLast()
   }
