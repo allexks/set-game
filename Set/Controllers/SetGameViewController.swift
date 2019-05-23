@@ -9,7 +9,7 @@
 import UIKit
 
 class SetGameViewController: UIViewController, SetGameDelegate {
-  
+
   // MARK: - Outlets
   
   @IBOutlet var cardButtons: [UIButton]!
@@ -62,20 +62,7 @@ class SetGameViewController: UIViewController, SetGameDelegate {
   // MARK: - Actions
   
   @IBAction func onTapCardButton(_ sender: UIButton) {
-    switch statusOfButton[sender]! {
-    case .notSelected, .mismatched:
-      selectButton(sender)
-      game.selectCard(cardsForButton[sender]!)
-      updateViews()
-    case .selected:
-      disselectButton(sender)
-      game.disselectCard(cardsForButton[sender]!)
-      updateViews()
-    case .matched:
-      removeMatched()
-    default:
-      break
-    }
+    game.selectCard(cardsForButton[sender]!)
   }
   
   @IBAction func onTapDealThreeCardsButton(_ sender: UIButton) {
@@ -87,15 +74,18 @@ class SetGameViewController: UIViewController, SetGameDelegate {
   func foundSet() {
     for card in game.selectedCards {
       let correspondingButton = cardsForButton.first { $1 == card }!.key
-      markMatched(correspondingButton)
+      statusOfButton[correspondingButton] = .matched
     }
     updateViews()
+    if !deckIsEmpty {
+      dealThreeCardsButton.isHidden = false
+    }
   }
   
   func foundMismatch() {
     for card in game.selectedCards {
       let correspondingButton = cardsForButton.first { $1 == card }!.key
-      markMismatched(correspondingButton)
+      statusOfButton[correspondingButton] = .mismatched
     }
     updateViews()
   }
@@ -116,26 +106,15 @@ class SetGameViewController: UIViewController, SetGameDelegate {
     updateViews()
   }
   
+  func updateSelectedCards() {
+    updateViews()
+  }
+  
   // MARK: - Helpers
   
-  private func selectButton(_ button: UIButton) {
-    let mismatchedButtons = cardButtons.filter({ statusOfButton[$0] == .mismatched })
-    for mbutton in mismatchedButtons {
-      statusOfButton[mbutton] = .notSelected
-    }
-    statusOfButton[button] = .selected
-  }
-  
-  private func disselectButton(_ button: UIButton) {
-    statusOfButton[button] = .notSelected
-  }
-  
-  private func markMatched(_ button: UIButton) {
-    statusOfButton[button] = .matched
-  }
-  
-  private func markMismatched(_ button: UIButton) {
-    statusOfButton[button] = .mismatched
+  private func dealThree() {
+    game.dealThreeCards()
+    updateViews()
   }
   
   private func hideButton(_ button: UIButton) {
@@ -144,52 +123,53 @@ class SetGameViewController: UIViewController, SetGameDelegate {
     button.alpha = 0
   }
   
-  private func unhideButton(_ button: UIButton) {
-    statusOfButton[button] = .notSelected
-    button.alpha = 1
-  }
-  
-  private func dealThree() {
-    game.dealThreeCards()
-    updateViews()
-  }
-  
-  private func removeMatched() {
-    let matchedButtons = cardButtons.filter({ statusOfButton[$0] == .matched })
-    
-    for button in matchedButtons {
-      hideButton(button)
-    }
-    
-    if !deckIsEmpty {
-      dealThree()
-    } else {
-      updateViews()
-    }
-  }
-  
   private func updateViews() {
-    for card in game.availableCards {
-      if !cardsForButton.values.contains(card) {
-        let pickAvailableButton = cardButtons.first(where: { cardsForButton[$0] == nil })!
-        cardsForButton[pickAvailableButton] = card
-        statusOfButton[pickAvailableButton] = .notSelected
+    for card in game.availableCards.filter({ !cardsForButton.values.contains($0) }) {
+      // pick a button for the new cards
+      let pickAvailableButton = cardButtons.first(where: { cardsForButton[$0] == nil })!
+      cardsForButton[pickAvailableButton] = card
+      statusOfButton[pickAvailableButton] = .notSelected
+    }
+    
+    for card in game.selectedCards {
+      // mark selected cards
+      let correspondingButton = cardButtons.first(where: { cardsForButton[$0] == card })!
+      if statusOfButton[correspondingButton]! == .notSelected {
+        statusOfButton[correspondingButton] = .selected
       }
     }
     
-    for button in cardButtons.filter({ statusOfButton[$0] != .unavailable }) {
+    for button in cardButtons {
+      if let card = cardsForButton[button], !game.selectedCards.contains(card) {
+        // update deselected and removed cards
+        if game.availableCards.contains(card) {
+          statusOfButton[button] = .notSelected
+        } else {
+          statusOfButton[button] = .unavailable
+        }
+      }
       renderCard(on: button)
     }
     
     if cardButtons.filter({ statusOfButton[$0]! == .unavailable }).isEmpty {
       // no more space for cards in the UI => disable deal cards button
       dealThreeCardsButton.isHidden = true
+    } else if !deckIsEmpty{
+      dealThreeCardsButton.isHidden = false
     }
   }
   
   private func renderCard(on button: UIButton) {
-    let card = cardsForButton[button]!
+    guard let cardStatus = statusOfButton[button],
+      cardStatus != .unavailable,
+      let card = cardsForButton[button]
+    else {
+      hideButton(button)
+      return
+    }
     
+    button.layer.borderColor = cardStatus.borderColor
+
     var cardText: String
     switch card.shape {
     case .diamond:
@@ -234,7 +214,7 @@ class SetGameViewController: UIViewController, SetGameDelegate {
       for: .normal
     )
     
-    button.layer.borderColor = statusOfButton[button]?.borderColor
+    button.alpha = 1
   }
 }
 

@@ -13,5 +13,6 @@ protocol SetGameDelegate: class {
   func foundMismatch()
   func deckGotEmpty()
   func updateScore(with newScore: Int)
+  func updateSelectedCards()
   func gameOver()
 }

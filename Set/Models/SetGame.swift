@@ -19,23 +19,27 @@ class SetGame {
   
   private let scoreRules: ScoreRules = .easy
   
-  private(set) var availableCards: [Card] = []
-  private(set) var discardedCards: [Card] = []
-  private(set) var selectedCards: [Card] = []
+  private(set) var availableCards: Set<Card> = []
+  private(set) var discardedCards: Set<Card> = []
+  private(set) var selectedCards: Set<Card> = [] {
+    didSet {
+      delegate?.updateSelectedCards()
+    }
+  }
   
   weak var delegate: SetGameDelegate?
   
   // MARK: - Methods
   
-  static func isSet(_ cardsArr: [Card]) -> Bool {
+  static func isSet(_ cardsArr: Set<Card>) -> Bool {
     guard cardsArr.count == 3 else {
       return false
     }
     
-    let numbers = Set(arrayLiteral: cardsArr.map{ $0.number })
-    let shapes = Set(arrayLiteral: cardsArr.map{ $0.shape })
-    let shadings = Set(arrayLiteral: cardsArr.map{ $0.shading })
-    let colors = Set(arrayLiteral: cardsArr.map{ $0.color })
+    let numbers = Set(cardsArr.map{ $0.number })
+    let shapes = Set(cardsArr.map{ $0.shape })
+    let shadings = Set(cardsArr.map{ $0.shading })
+    let colors = Set(cardsArr.map{ $0.color })
     
     return numbers.count == Card.Number.allCases.count
         && shapes.count == Card.Shape.allCases.count
@@ -45,39 +49,43 @@ class SetGame {
   
   
   func selectCard(_ card: Card) {
-    guard !selectedCards.contains(card) else {
-      return
+    if SetGame.isSet(selectedCards) {
+      removeMatchedCards()
+      if selectedCards.contains(card) {
+        selectedCards = []
+        return
+      }
     }
     
     if selectedCards.count == 3 {
       selectedCards = []
     }
     
-    selectedCards.append(card)
-    
-    if selectedCards.count == 3 {
-      if SetGame.isSet(selectedCards) {
-        score = score + scoreRules.updateOnMatch
-        delegate?.foundSet()
-        removeMatchedCards()
-      } else {
-        score = score + scoreRules.updateOnMismatch
-        delegate?.foundMismatch()
-      }
+    if selectedCards.contains(card) {
+      selectedCards.remove(card)
+    } else {
+      selectedCards.insert(card)
     }
-  }
-  
-  func disselectCard(_ card: Card) {
-    if let indexToRemove = selectedCards.firstIndex(of: card) {
-      selectedCards.remove(at: indexToRemove)
+    
+    if SetGame.isSet(selectedCards) {
+      score = score + scoreRules.updateOnMatch
+      delegate?.foundSet()
+    } else if selectedCards.count == 3 {
+      score = score + scoreRules.updateOnMismatch
+      delegate?.foundMismatch()
     }
   }
   
   func dealThreeCards() {
     guard !deck.isEmpty else { return }
     
+    if SetGame.isSet(selectedCards) {
+      removeMatchedCards()
+      selectedCards = []
+    }
+    
     3.repetitions {
-      self.availableCards.append(self.deck.draw())
+      self.availableCards.insert(self.deck.draw())
     }
     
     if let scoreChange = scoreRules.updateOnDealingThreeCards {
@@ -90,14 +98,18 @@ class SetGame {
   }
   
   private func removeMatchedCards() {
-    availableCards = availableCards.filter({ !selectedCards.contains($0) })
-    discardedCards = discardedCards + selectedCards
+    assert(selectedCards.count == 3 && selectedCards.isSubset(of: availableCards))
+    
+    availableCards.formSymmetricDifference(selectedCards) // remove
+    discardedCards.formUnion(selectedCards) // add
     
     if availableCards.count == 0 && deck.isEmpty {
       delegate?.gameOver()
     }
   }
 }
+
+// MARK: - Score Rules
 
 extension SetGame {
   enum ScoreRules {

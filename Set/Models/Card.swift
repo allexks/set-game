@@ -9,6 +9,13 @@
 import Foundation
 
 struct Card: Equatable, Hashable {
+  let number: Number
+  let shape: Shape
+  let shading: Shading
+  let color: Color
+}
+
+extension Card {
   enum Number: Int, CaseIterable {
     case one = 1, two, three
   }
@@ -24,9 +31,4 @@ struct Card: Equatable, Hashable {
   enum Color: CaseIterable {
     case red, green, purple
   }
-  
-  let number: Number
-  let shape: Shape
-  let shading: Shading
-  let color: Color
 }
